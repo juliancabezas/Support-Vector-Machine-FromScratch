@@ -18,51 +18,40 @@ import cvxopt.solvers as solvers
 def svm_train_primal(data_train, label_train , regularisation_para_C):
 
 
-    #n_samples = np.shape(data_train)[0]
-    #n_features = np.shape(data_train)[1]
-
-    #n,D = data_train.shape
-
-    #ones = np.ones(n).reshape((n,1))
-
-    #multinomial = np.array([(data_train[:,i]*data_train[:,j]).reshape((n,1)) for i in range(D) for j in range(i,D)]).T[0,:,:]
-
-    #data_train = np.hstack([ones, data_train, multinomial])
-
-    n,m = data_train.shape
+    n_samples = np.shape(data_train)[0]
+    m_features = np.shape(data_train)[1]
 
 
+    P = np.zeros((m_features+n_samples+1,m_features+n_samples+1))
 
-    #label_train = label_train.reshape((1,label_train.shape[0]))
-
-    P = np.zeros((m+n+1,m+n+1))
-
-    for i in range(m):
+    for i in range(m_features):
         P[i,i] = 1
 
-    print(P)
-    
-    q = np.vstack([np.zeros((m+1,1)), regularisation_para_C* np.ones((n,1))])
 
-    #q = -q
+    #print(P)
 
-    print(q)
+    # The q term belong to the second bart of the top equation
+    # The first part is zeroes, corresponding to the weights and the intercept, 
+    # and the second part to the slack variables, that are multiplied by the cost
+    q_zeros = np.zeros((m_features+1,1))
+    q_slack = 1/n_samples * regularisation_para_C* np.ones((n_samples,1))
+    q = np.vstack([q_zeros,q_slack])
 
-    G = np.zeros((2*n, m+1+n))
 
-    G[:n,0:m] = label_train @ data_train
-    G[:n,m] = label_train.T
-    G[:n,m+1:]  = np.eye(n)
-    G[n:,m+1:] = np.eye(n)
+    G = np.zeros((2*n_samples, m_features+1+n_samples))
+
+    G[:n_samples,0:m_features] = label_train @ data_train
+    G[:n_samples,m_features] = label_train.T
+    G[:n_samples,m_features+1:]  = np.eye(n_samples)
+    G[n_samples:,m_features+1:] = np.eye(n_samples)
     G = -G
 
-    print(G)
+    #print(G)
 
-    h = np.zeros((2*n,1))
-    h[:n] = -1
+    h = np.zeros((2*n_samples,1))
+    h[:n_samples] = -1
 
-
-    print(h)
+    #print(h)
     ## E and d are not used in the primal form
     ## convert to array
     ## have to convert everything to cxvopt matrices
@@ -72,26 +61,28 @@ def svm_train_primal(data_train, label_train , regularisation_para_C):
     h = cvxopt.matrix(h,h.shape,'d')
     ## set up cvxopt
     ## z (the vector being minimized for) in this case is [w, b, eps].T
-    sol = solvers.qp(P, q, G, h)
+    print("Starting quadratic solver!")
+    qp_solution = solvers.qp(P, q, G, h)
 
-    w = np.array(sol['x'][:m])
-    b = sol['x'][m]
-    slack = np.array(sol['x'][m+1:])
+    weights = np.array(qp_solution['x'][:m_features])
+    intercept = qp_solution['x'][m_features]
+    slack = np.array(qp_solution['x'][m_features+1:])
 
-    return sol
+    return qp_solution
 
 
 def svn_predict_dual(data_test,label_test,svn_model):
 
 
-    n,m = data_test.shape
+    n_samples = np.shape(data_test)[0]
+    m_features = np.shape(data_test)[1]
 
-    w = np.array(svn_model['x'][:m])
-    b = svn_model['x'][m]
+    weights = np.array(svn_model['x'][:m_features])
+    intercept = svn_model['x'][m_features]
 
-    weighted = np.dot(data_test, w) + b
+    weighted_sum = np.dot(data_test, weights) + intercept
 
-    prediction = np.sign(weighted)
+    prediction = np.sign(weighted_sum)
 
     acc = accuracy_score(label_test,prediction)
 
@@ -139,7 +130,7 @@ def main():
     #print(y_test)
 
 
-    svn_model = svm_train_primal(data_train = x_train, label_train= y_train, regularisation_para_C = 10)
+    svn_model = svm_train_primal(data_train = x_train, label_train= y_train, regularisation_para_C = 10000)
 
     test_accuracy = svn_predict_dual(data_test = x_test,label_test = y_test, svn_model = svn_model)
 
@@ -159,7 +150,7 @@ def main():
 
     # Test different cost values in each split
     #cost_array = np.arange(start=0.5, stop=10.5, step=0.5)
-    cost_array = [0.01, 0.5, 1.0, 5.0, 10.0]
+    cost_array = [0.01, 0.5, 1.0, 5.0, 10.0, 100.0]
 
     # Store the partial results in lists
     cost_full = []
@@ -168,11 +159,9 @@ def main():
     # Loop trough the different combinations of step and number of iterations
     for cost in cost_array:
 
-        # Store partial results for accuracy, cohen kappa and F1
+        # Store partial results for accuracy
         acc = []
 
-        # Initialize the support vector classifier
-        svm = SVC(random_state=124, kernel='linear', C = cost)
     
         # Iterate thorgh the folds
         for kfold_train_index, kfold_test_index in k_fold.split(x_train, y_train):
@@ -181,12 +170,12 @@ def main():
             kfold_x_train, kfold_x_test = x_train[kfold_train_index][:], x_train[kfold_test_index][:]
             kfold_y_train, kfold_y_test = y_train[kfold_train_index], y_train[kfold_test_index]
 
-            # Train the SVM and get the predicted values
-            svm.fit(kfold_x_train,kfold_y_train)
-            predicted = svm.predict(kfold_x_test)
+            # Train the SVM and get the accuracy
+            svn_model = svm_train_primal(data_train = kfold_x_train, label_train= kfold_y_train, regularisation_para_C = cost)
+            acc_kfold = svn_predict_dual(data_test = kfold_x_test, label_test = kfold_y_test, svn_model = svn_model)
 
             # Calculate the indexes and store them
-            acc.append(accuracy_score(kfold_y_test,predicted))
+            acc.append(acc_kfold)
 
         print("Testing the model with cost = ", cost)
         
@@ -214,21 +203,20 @@ def main():
 
     print("Training final model")
 
-    # Training of the final model
-    svm = SVC(random_state = 124, kernel='linear', C = cost_max)
+    svn_model = svm_train_primal(data_train = x_train, label_train= y_train, regularisation_para_C = cost_max)
 
-    svm.fit(x_train,y_train)
-    predicted_final = svm.predict(x_test)
+    test_accuracy = svn_predict_dual(data_test = x_test,label_test = y_test, svn_model = svn_model)
 
-    # Calculate the indexes of the final results
-    acc_final = accuracy_score(y_test,predicted_final)
+    print(test_accuracy)
 
     print("Testing final model")
-    print("Accuracy:", acc_final)
+    print("Accuracy:", test_accuracy)
+
+    print("Ready!")
 
     # Confusion matrix
-    print("Confusion matrix:")
-    print(confusion_matrix(y_test,predicted_final))
+    #print("Confusion matrix:")
+    #print(confusion_matrix(y_test,predicted_final))
 
 
 if __name__ == '__main__':
