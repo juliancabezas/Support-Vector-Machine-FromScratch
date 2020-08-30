@@ -150,18 +150,17 @@ def svm_train_dual(data_train, label_train , regularisation_para_C):
 
     # Third equation
     # Corresponds to the sum of alpha_i*y_i= 0, so A will only by the labels and b a column of zeroes
-    A = cvxopt.matrix(label_train, (1,n_samples))
-    b = np.array([[0]])
+    A = np.reshape(label_train, (1,n_samples))
+    b = 0.0
 
     
-
-    # Convert to the CVROPT matrix type
+    # Convert to the CVXOPT matrix type
     P = cvxopt.matrix(P)
     q = cvxopt.matrix(q)
     G = cvxopt.matrix(G)
     h = cvxopt.matrix(h)
-    #A = cvxopt.matrix(A)
-    b = cvxopt.matrix(0.0)
+    A = cvxopt.matrix(A)
+    b = cvxopt.matrix(b)
 
     # solve QP problem
     print("Starting the solver")
@@ -173,6 +172,8 @@ def svm_train_dual(data_train, label_train , regularisation_para_C):
     # Support vectors have non zero lagrange multipliers
     sup_vect_bool = lagrange > 0.00001
     ind = np.arange(len(lagrange))[sup_vect_bool]
+
+    # Get the support vectors for x and y
     lagrange = lagrange[sup_vect_bool]
     sup_vect = data_train[sup_vect_bool]
     sup_vect_y = label_train[sup_vect_bool]
@@ -253,20 +254,20 @@ def main():
 
 
 
-    #svn_model = svm_train_dual(data_train = x_train, label_train= y_train, regularisation_para_C = 10000)
+    svn_model = svm_train_dual(data_train = x_train, label_train= y_train, regularisation_para_C = 10000)
 
-    #test_accuracy = svn_predict_dual(data_test = x_test,label_test = y_test, svn_model = svn_model)
+    test_accuracy = svn_predict_dual(data_test = x_test,label_test = y_test, svn_model = svn_model)
 
-    #print(test_accuracy)
-
-
+    print(test_accuracy)
 
 
-    #svn_model = svm_train_primal(data_train = x_train, label_train= y_train, regularisation_para_C = 10000)
 
-    #test_accuracy = svn_predict_primal(data_test = x_test,label_test = y_test, svn_model = svn_model)
 
-    #print(test_accuracy)
+    svn_model = svm_train_primal(data_train = x_train, label_train= y_train, regularisation_para_C = 10000)
+
+    test_accuracy = svn_predict_primal(data_test = x_test,label_test = y_test, svn_model = svn_model)
+
+    print(test_accuracy)
 
     #------------------------------------------------------------------------
     # Tuning of the primal implementation
@@ -282,7 +283,7 @@ def main():
     cost_full = []
     acc_full = []
 
-    if not os.path.exists('Cross_Validation/cost_cv_svm_sklearn.csv'):
+    if not os.path.exists('Cross_Validation/cost_cv_svm_primal.csv'):
     
     # Loop trough the different combinations of step and number of iterations
         for cost in cost_array:
@@ -337,20 +338,102 @@ def main():
 
     print("Training final model")
 
+    # Final model training using the cost we obtained using cross validation
     svn_model = svm_train_primal(data_train = x_train, label_train= y_train, regularisation_para_C = cost_max)
 
+    # Get the accuracy of the final model on the test data
     test_accuracy = svn_predict_primal(data_test = x_test,label_test = y_test, svn_model = svn_model)
 
     print(test_accuracy)
 
-    print("Testing final model")
+    print("Testing final model - primal implementation")
     print("Accuracy:", test_accuracy)
 
     print("Ready!")
 
-    # Confusion matrix
-    #print("Confusion matrix:")
-    #print(confusion_matrix(y_test,predicted_final))
+
+    #------------------------------------------------------------------------
+    # Tuning of the dual implementation
+
+    # set up a 5-fold partition of the train data
+    k_fold = KFold(n_splits=5, random_state=23,shuffle=True)
+
+    # Test different cost values in each split
+    #cost_array = np.arange(start=0.5, stop=10.5, step=0.5)
+    cost_array = [1.0, 10.0, 100.0,1000.0,10000.0]
+
+    # Store the partial results in lists
+    cost_full = []
+    acc_full = []
+
+    if not os.path.exists('Cross_Validation/cost_cv_svm_dual.csv'):
+    
+    # Loop trough the different combinations of step and number of iterations
+        for cost in cost_array:
+
+            # Store partial results for accuracy
+            acc = []
+
+        
+            # Iterate thorgh the folds
+            for kfold_train_index, kfold_test_index in k_fold.split(x_train, y_train):
+                
+                # Get the split into train and test
+                kfold_x_train, kfold_x_test = x_train[kfold_train_index][:], x_train[kfold_test_index][:]
+                kfold_y_train, kfold_y_test = y_train[kfold_train_index], y_train[kfold_test_index]
+
+                # Train the SVM and get the accuracy
+                svn_model = svm_train_primal(data_train = kfold_x_train, label_train= kfold_y_train, regularisation_para_C = cost)
+                acc_kfold = svn_predict_primal(data_test = kfold_x_test, label_test = kfold_y_test, svn_model = svn_model)
+
+                # Calculate the indexes and store them
+                acc.append(acc_kfold)
+
+            print("Testing the model with cost = ", cost)
+            
+            # Store the mean of the indexes for the 4 folds
+            cost_full.append(cost)
+            acc_full.append(np.mean(acc))
+            print("Mean Accuracy = ", np.mean(acc))
+
+        # Create pandas dataset
+        dic = {'cost':cost_full, 'accuracy':acc_full}
+        df_grid_search = pd.DataFrame(dic)
+        df_grid_search.to_csv('Cross_Validation/cost_cv_svm_dual.csv')
+        print("Tuning Ready!")
+    else:
+        # In case the parameters were already tuned
+        df_grid_search = pd.read_csv('Cross_Validation/cost_cv_svm_dual.csv')
+        print("Previous tuning detected")
+
+    print("Tuning Ready!")
+
+    # Search the bigger accuracy index in the dataframe
+    row_max = df_grid_search['accuracy'].argmax()
+
+    # Get the the better performing cost
+    cost_max = float(df_grid_search['cost'].values[row_max])
+
+    print("")
+    print("The parameter was chosen looking at the maximum accuracy score")
+    print("Accuracy:", df_grid_search['accuracy'][row_max])
+    print("Using cost = ", cost_max)
+
+    print("Training final model")
+    
+    # Final model training using the cost we obtained using cross validation
+    svn_model = svm_train_primal(data_train = x_train, label_train= y_train, regularisation_para_C = cost_max)
+
+    # Getting the accuracy of the model on the test set
+    test_accuracy = svn_predict_primal(data_test = x_test,label_test = y_test, svn_model = svn_model)
+
+    print(test_accuracy)
+
+    print("Testing final model - dual implementation")
+    print("Accuracy:", test_accuracy)
+
+    print("Ready!")
+
 
 
 if __name__ == '__main__':
