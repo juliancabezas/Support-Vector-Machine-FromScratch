@@ -15,6 +15,8 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 import cvxopt as cvxopt
 import cvxopt.solvers as solvers
 
+import os
+
 def svm_train_primal(data_train, label_train , regularisation_para_C):
 
     # Get the dimensions of the data
@@ -71,22 +73,23 @@ def svm_train_primal(data_train, label_train , regularisation_para_C):
     print("Starting quadratic solver!")
     qp_solution = solvers.qp(P, q, G, h)
 
-    # Debugging
+    # Get the weights
     weights = np.array(qp_solution['x'][:m_features])
-    intercept = qp_solution['x'][m_features]
-    slack = np.array(qp_solution['x'][m_features+1:])
 
-    return qp_solution
+    # Get the intercept
+    intercept = qp_solution['x'][m_features]
+
+
+    return np.append(weights,np.array(intercept))
+
+
 
 
 def svn_predict_primal(data_test,label_test,svn_model):
 
-    # Get the dimensions of the data 
-    m_features = np.shape(data_test)[1]
-
-    # Extraxt the wrights and intercept from the solver object 
-    weights = np.array(svn_model[:m_features])
-    intercept = svn_model[m_features]
+    # Extract the wrights and intercept from the ssvn model output
+    weights = svn_model[:(len(svn_model) - 1)]
+    intercept = svn_model[len(svn_model) - 1]
 
     # Calculate the weighted sum
     weighted_sum = np.dot(data_test, weights) + intercept
@@ -102,19 +105,21 @@ def svn_predict_primal(data_test,label_test,svn_model):
 
 
 def svm_train_dual(data_train, label_train , regularisation_para_C):
-    n_samples, n_features = data_train.shape
+    
+    # Get the dimensions of the data
+    n_samples = np.shape(data_train)[0]
+    m_features = np.shape(data_train)[1]
 
     # Gram matrix
-    Gram = np.zeros((n_samples, n_samples))
+    #Gram = np.zeros((n_samples, n_samples))
 
-    for i in range(n_samples):
-        #print(i)
-        for j in range(n_samples):
-            Gram[i,j] = np.dot(data_train[i], data_train[j])
+    #for i in range(n_samples):
+    #    for j in range(n_samples):
+    #        Gram[i,j] = np.dot(data_train[i], data_train[j])
 
 
     # Fistly I have to calculate the Gram matrix
-    #Gram = data_train.dot(data_train.T)
+    Gram = data_train.dot(data_train.T)
 
     # First equation
     # It is the sum of (y_i*y_j*<x_1,x_j>)
@@ -160,40 +165,46 @@ def svm_train_dual(data_train, label_train , regularisation_para_C):
 
     # solve QP problem
     print("Starting the solver")
-    solution = cvxopt.solvers.qp(P, q, G, h, A, b)
+    qp_solution = cvxopt.solvers.qp(P, q, G, h, A, b)
 
-    # Lagrange multipliers
-    a = np.ravel(solution['x'])
+    # Vector with lagrange multipliers, the solution of the quadratic equation
+    lagrange = np.ravel(qp_solution['x'])
 
     # Support vectors have non zero lagrange multipliers
-    sv_bool = a > 1e-5
-    ind = np.arange(len(a))[sv_bool]
-    a = a[sv_bool]
-    sv = data_train[sv_bool]
-    sv_y = label_train[sv_bool]
-    print("%d support vectors out of %d points" % (len(a), n_samples))
+    sup_vect_bool = lagrange > 0.00001
+    ind = np.arange(len(lagrange))[sup_vect_bool]
+    lagrange = lagrange[sup_vect_bool]
+    sup_vect = data_train[sup_vect_bool]
+    sup_vect_y = label_train[sup_vect_bool]
 
-    # Intercept
-    b = 0
-    for n in range(len(a)):
-        b += sv_y[n]
-        b -= np.sum(a * sv_y * Gram[ind[n],sv_bool])
-    b /= len(a)
+    # Weights
+    weights = np.zeros(m_features)
+    
+    # The weights are the sum of the product of alpha_i, y_i and x_i for the support vectors
+    for i in range(len(lagrange)):
+        sum = lagrange[i] * sup_vect_y[i] * sup_vect[i]
+        weights = weights + sum
 
-    w = np.zeros(n_features)
-    for n in range(len(a)):
-        w += a[n] * sv_y[n] * sv[n]
+    # Intercept (b)
+    intercept = 0
+    for i in range(len(lagrange)):
+        intercept = intercept + sup_vect_y[i]
+        intercept =  intercept - np.sum(lagrange * sup_vect_y * Gram[ind[i], sup_vect_bool])
 
-    print(w)
-    print(b)
+    intercept = intercept / len(lagrange)
+
+
+
+    print(weights)
+    print(intercept)
     print("Ready")
 
-    return np.append(w,np.array(b))
+    return np.append(weights,np.array(intercept))
 
 def svn_predict_dual(data_test,label_test,svn_model):
 
 
-    # Extraxt the wrights and intercept from the ssvn model output
+    # Extract the wrights and intercept from the ssvn model output
     weights = svn_model[:(len(svn_model) - 1)]
     intercept = svn_model[len(svn_model) - 1]
 
@@ -213,6 +224,9 @@ def svn_predict_dual(data_test,label_test,svn_model):
 # tune the parameters of the Random forest and evaluate the final model
 def main():
 
+    #----------------------------------------------
+    # Data reading and preprocessing
+
     # Train data
 
     # Read the database using pandas
@@ -221,13 +235,9 @@ def main():
     # Recode the output column to get -1 and 1 output values
     data.iloc[:, 0] = np.where(data.iloc[:, 0] == 0, -1, data.iloc[:, 0])
 
-    # Generate lists of lists
-    #x_train = data.iloc[:, -1:].values
+    # Generate lists
     x_train = data.drop(data.columns[0], axis=1).values
     y_train = data.iloc[:, 0].values
-
-    #print(x_train)
-    #print(y_train)
 
     # Test data
 
@@ -238,77 +248,79 @@ def main():
     data.iloc[:, 0] = np.where(data.iloc[:, 0] == 0, -1, data.iloc[:, 0])
 
     # Generate lists of lists
-    #x_test = data.iloc[:, -1:].values
     x_test = data.drop(data.columns[0], axis=1).values
     y_test = data.iloc[:, 0].values
 
-    #print(x_test)
-    #print(y_test)
 
 
-    svn_model = svm_train_dual(data_train = x_train, label_train= y_train, regularisation_para_C = 10000)
+    #svn_model = svm_train_dual(data_train = x_train, label_train= y_train, regularisation_para_C = 10000)
 
-    test_accuracy = svn_predict_primal(data_test = x_test,label_test = y_test, svn_model = svn_model)
+    #test_accuracy = svn_predict_dual(data_test = x_test,label_test = y_test, svn_model = svn_model)
 
-    print(test_accuracy)
-
-    svn_model = svm_train_primal(data_train = x_train, label_train= y_train, regularisation_para_C = 10000)
-
-    test_accuracy = svn_predict_primal(data_test = x_test,label_test = y_test, svn_model = svn_model)
-
-    print(test_accuracy)
+    #print(test_accuracy)
 
 
 
 
+    #svn_model = svm_train_primal(data_train = x_train, label_train= y_train, regularisation_para_C = 10000)
 
+    #test_accuracy = svn_predict_primal(data_test = x_test,label_test = y_test, svn_model = svn_model)
 
+    #print(test_accuracy)
 
-
-
+    #------------------------------------------------------------------------
+    # Tuning of the primal implementation
 
     # set up a 5-fold partition of the train data
     k_fold = KFold(n_splits=5, random_state=23,shuffle=True)
 
     # Test different cost values in each split
     #cost_array = np.arange(start=0.5, stop=10.5, step=0.5)
-    cost_array = [0.01, 0.5, 1.0, 5.0, 10.0, 100.0]
+    cost_array = [1.0, 10.0, 100.0,1000.0,10000.0]
 
     # Store the partial results in lists
     cost_full = []
     acc_full = []
 
-    # Loop trough the different combinations of step and number of iterations
-    for cost in cost_array:
-
-        # Store partial results for accuracy
-        acc = []
-
+    if not os.path.exists('Cross_Validation/cost_cv_svm_sklearn.csv'):
     
-        # Iterate thorgh the folds
-        for kfold_train_index, kfold_test_index in k_fold.split(x_train, y_train):
-            
-            # Get the split into train and test
-            kfold_x_train, kfold_x_test = x_train[kfold_train_index][:], x_train[kfold_test_index][:]
-            kfold_y_train, kfold_y_test = y_train[kfold_train_index], y_train[kfold_test_index]
+    # Loop trough the different combinations of step and number of iterations
+        for cost in cost_array:
 
-            # Train the SVM and get the accuracy
-            svn_model = svm_train_primal(data_train = kfold_x_train, label_train= kfold_y_train, regularisation_para_C = cost)
-            acc_kfold = svn_predict_primal(data_test = kfold_x_test, label_test = kfold_y_test, svn_model = svn_model)
+            # Store partial results for accuracy
+            acc = []
 
-            # Calculate the indexes and store them
-            acc.append(acc_kfold)
-
-        print("Testing the model with cost = ", cost)
         
-        # Store the mean of the indexes for the 4 folds
-        cost_full.append(cost)
-        acc_full.append(np.mean(acc))
-        print("Mean Accuracy = ", np.mean(acc))
+            # Iterate thorgh the folds
+            for kfold_train_index, kfold_test_index in k_fold.split(x_train, y_train):
+                
+                # Get the split into train and test
+                kfold_x_train, kfold_x_test = x_train[kfold_train_index][:], x_train[kfold_test_index][:]
+                kfold_y_train, kfold_y_test = y_train[kfold_train_index], y_train[kfold_test_index]
 
-    # Create pandas dataset
-    dic = {'cost':cost_full, 'accuracy':acc_full}
-    df_grid_search = pd.DataFrame(dic)
+                # Train the SVM and get the accuracy
+                svn_model = svm_train_primal(data_train = kfold_x_train, label_train= kfold_y_train, regularisation_para_C = cost)
+                acc_kfold = svn_predict_primal(data_test = kfold_x_test, label_test = kfold_y_test, svn_model = svn_model)
+
+                # Calculate the indexes and store them
+                acc.append(acc_kfold)
+
+            print("Testing the model with cost = ", cost)
+            
+            # Store the mean of the indexes for the 4 folds
+            cost_full.append(cost)
+            acc_full.append(np.mean(acc))
+            print("Mean Accuracy = ", np.mean(acc))
+
+        # Create pandas dataset
+        dic = {'cost':cost_full, 'accuracy':acc_full}
+        df_grid_search = pd.DataFrame(dic)
+        df_grid_search.to_csv('Cross_Validation/cost_cv_svm_primal.csv')
+        print("Tuning Ready!")
+    else:
+        # In case the parameters were already tuned
+        df_grid_search = pd.read_csv('Cross_Validation/cost_cv_svm_primal.csv')
+        print("Previous tuning detected")
 
     print("Tuning Ready!")
 
@@ -327,7 +339,7 @@ def main():
 
     svn_model = svm_train_primal(data_train = x_train, label_train= y_train, regularisation_para_C = cost_max)
 
-    test_accuracy = svn_predict_dual(data_test = x_test,label_test = y_test, svn_model = svn_model)
+    test_accuracy = svn_predict_primal(data_test = x_test,label_test = y_test, svn_model = svn_model)
 
     print(test_accuracy)
 
