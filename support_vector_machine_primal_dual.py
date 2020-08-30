@@ -17,18 +17,18 @@ import cvxopt.solvers as solvers
 
 def svm_train_primal(data_train, label_train , regularisation_para_C):
 
-
+    # Get the dimensions of the data
     n_samples = np.shape(data_train)[0]
     m_features = np.shape(data_train)[1]
 
+    # First (Top equation) of the optimization problem
 
+    # The vector X will be optimized, this vector corresponds to [weights,intercept,Epsilon(slack variable)]
+
+    # According to the CVXOPT apy the first term is (1/2) * X.T P X
+    # P will be a identity matrix in the top and zeroes in the bottom, that way we will get ||weights||
     P = np.zeros((m_features+n_samples+1,m_features+n_samples+1))
-
-    for i in range(m_features):
-        P[i,i] = 1
-
-
-    #print(P)
+    P[:m_features,:m_features] = np.identity(m_features)
 
     # The q term belong to the second bart of the top equation
     # The first part is zeroes, corresponding to the weights and the intercept, 
@@ -37,33 +37,41 @@ def svm_train_primal(data_train, label_train , regularisation_para_C):
     q_slack = 1/n_samples * regularisation_para_C* np.ones((n_samples,1))
     q = np.vstack([q_zeros,q_slack])
 
+    # Second equation
 
+    # G will be multiplied by  X like this: Gx < h
+    # Then I have to make sure the y(w.T x + b) equation is represented in the G array
     G = np.zeros((2*n_samples, m_features+1+n_samples))
 
+    # yX
     G[:n_samples,0:m_features] = label_train @ data_train
+    # One extra column for the label alone (it will be multiplied with the intercept b)
     G[:n_samples,m_features] = label_train.T
-    G[:n_samples,m_features+1:]  = np.eye(n_samples)
-    G[n_samples:,m_features+1:] = np.eye(n_samples)
-    G = -G
 
-    #print(G)
-
+    # The right part of the matrix will be identity matrices, they will be multiplied by the slack variable
+    # (We are passing the slack variables to the left side of the equation)
+    G[:n_samples,m_features+1:]  = np.identity(n_samples)
+    G[n_samples:,m_features+1:] = np.identity(n_samples)
+    
+    # The h is the "1" in the second equation
     h = np.zeros((2*n_samples,1))
-    h[:n_samples] = -1
+    h[:n_samples] = 1.0
 
-    #print(h)
-    ## E and d are not used in the primal form
-    ## convert to array
-    ## have to convert everything to cxvopt matrices
-    P = cvxopt.matrix(P,P.shape,'d')
-    q = cvxopt.matrix(q,q.shape,'d')
-    G = cvxopt.matrix(G,G.shape,'d')
-    h = cvxopt.matrix(h,h.shape,'d')
-    ## set up cvxopt
-    ## z (the vector being minimized for) in this case is [w, b, eps].T
+    # Here I reverse the inequality, making it Gx > h
+    G = -G
+    h = -h
+
+    # Convert to the CVROPT matrix type
+    P = cvxopt.matrix(P)
+    q = cvxopt.matrix(q)
+    G = cvxopt.matrix(G)
+    h = cvxopt.matrix(h)
+
+    # Quadratic solver, in this case we will not use the bottom equation, hence A and b are not needed
     print("Starting quadratic solver!")
     qp_solution = solvers.qp(P, q, G, h)
 
+    # Debugging
     weights = np.array(qp_solution['x'][:m_features])
     intercept = qp_solution['x'][m_features]
     slack = np.array(qp_solution['x'][m_features+1:])
@@ -71,26 +79,134 @@ def svm_train_primal(data_train, label_train , regularisation_para_C):
     return qp_solution
 
 
-def svn_predict_dual(data_test,label_test,svn_model):
+def svn_predict_primal(data_test,label_test,svn_model):
 
-
-    n_samples = np.shape(data_test)[0]
+    # Get the dimensions of the data 
     m_features = np.shape(data_test)[1]
 
-    weights = np.array(svn_model['x'][:m_features])
-    intercept = svn_model['x'][m_features]
+    # Extraxt the wrights and intercept from the solver object 
+    weights = np.array(svn_model[:m_features])
+    intercept = svn_model[m_features]
 
+    # Calculate the weighted sum
     weighted_sum = np.dot(data_test, weights) + intercept
 
+    #Predict using the sign function, this will be -1 or +1
     prediction = np.sign(weighted_sum)
 
+    # Get the accuracy of the prediction
     acc = accuracy_score(label_test,prediction)
 
     return acc
 
 
 
+def svm_train_dual(data_train, label_train , regularisation_para_C):
+    n_samples, n_features = data_train.shape
 
+    # Gram matrix
+    Gram = np.zeros((n_samples, n_samples))
+
+    for i in range(n_samples):
+        #print(i)
+        for j in range(n_samples):
+            Gram[i,j] = np.dot(data_train[i], data_train[j])
+
+
+    # Fistly I have to calculate the Gram matrix
+    #Gram = data_train.dot(data_train.T)
+
+    # First equation
+    # It is the sum of (y_i*y_j*<x_1,x_j>)
+
+    P = np.outer(label_train,label_train) * Gram
+
+    print(P)
+
+    # q is just a column of -1, ad q.T is multiplied by the alphas in the SVXOPT API
+    q = np.ones(n_samples) * -1
+
+    print(q)
+
+    # Second equation
+
+    # G has a diagonal matrix in the top and an identity matrix in the bottom, as only the 
+    tmp1 = np.diag(np.ones(n_samples) * -1)
+    tmp2 = np.identity(n_samples)
+    G = np.vstack((tmp1, tmp2))
+
+    print(G)
+
+    tmp1 = np.zeros(n_samples)
+    tmp2 = np.ones(n_samples) * regularisation_para_C * (1/n_samples)
+    h = np.hstack((tmp1, tmp2))
+
+    print(h)
+
+    # Third equation
+    # Corresponds to the sum of alpha_i*y_i= 0, so A will only by the labels and b a column of zeroes
+    A = cvxopt.matrix(label_train, (1,n_samples))
+    b = np.array([[0]])
+
+    
+
+    # Convert to the CVROPT matrix type
+    P = cvxopt.matrix(P)
+    q = cvxopt.matrix(q)
+    G = cvxopt.matrix(G)
+    h = cvxopt.matrix(h)
+    #A = cvxopt.matrix(A)
+    b = cvxopt.matrix(0.0)
+
+    # solve QP problem
+    print("Starting the solver")
+    solution = cvxopt.solvers.qp(P, q, G, h, A, b)
+
+    # Lagrange multipliers
+    a = np.ravel(solution['x'])
+
+    # Support vectors have non zero lagrange multipliers
+    sv_bool = a > 1e-5
+    ind = np.arange(len(a))[sv_bool]
+    a = a[sv_bool]
+    sv = data_train[sv_bool]
+    sv_y = label_train[sv_bool]
+    print("%d support vectors out of %d points" % (len(a), n_samples))
+
+    # Intercept
+    b = 0
+    for n in range(len(a)):
+        b += sv_y[n]
+        b -= np.sum(a * sv_y * Gram[ind[n],sv_bool])
+    b /= len(a)
+
+    w = np.zeros(n_features)
+    for n in range(len(a)):
+        w += a[n] * sv_y[n] * sv[n]
+
+    print(w)
+    print(b)
+    print("Ready")
+
+    return np.append(w,np.array(b))
+
+def svn_predict_dual(data_test,label_test,svn_model):
+
+
+    # Extraxt the wrights and intercept from the ssvn model output
+    weights = svn_model[:(len(svn_model) - 1)]
+    intercept = svn_model[len(svn_model) - 1]
+
+    # Calculate the weighted sum
+    weighted_sum = np.dot(data_test, weights) + intercept
+
+    #Predict using the sign function, this will be -1 or +1
+    prediction = np.sign(weighted_sum)
+
+    # Get the accuracy of the prediction
+    acc = accuracy_score(label_test,prediction)
+
+    return acc
 
 
 # Main function, it will preprocess the data, create train and test data,
@@ -130,9 +246,15 @@ def main():
     #print(y_test)
 
 
+    svn_model = svm_train_dual(data_train = x_train, label_train= y_train, regularisation_para_C = 10000)
+
+    test_accuracy = svn_predict_primal(data_test = x_test,label_test = y_test, svn_model = svn_model)
+
+    print(test_accuracy)
+
     svn_model = svm_train_primal(data_train = x_train, label_train= y_train, regularisation_para_C = 10000)
 
-    test_accuracy = svn_predict_dual(data_test = x_test,label_test = y_test, svn_model = svn_model)
+    test_accuracy = svn_predict_primal(data_test = x_test,label_test = y_test, svn_model = svn_model)
 
     print(test_accuracy)
 
@@ -172,7 +294,7 @@ def main():
 
             # Train the SVM and get the accuracy
             svn_model = svm_train_primal(data_train = kfold_x_train, label_train= kfold_y_train, regularisation_para_C = cost)
-            acc_kfold = svn_predict_dual(data_test = kfold_x_test, label_test = kfold_y_test, svn_model = svn_model)
+            acc_kfold = svn_predict_primal(data_test = kfold_x_test, label_test = kfold_y_test, svn_model = svn_model)
 
             # Calculate the indexes and store them
             acc.append(acc_kfold)
