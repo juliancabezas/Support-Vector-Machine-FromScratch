@@ -110,50 +110,27 @@ def svm_train_dual(data_train, label_train , regularisation_para_C):
     n_samples = np.shape(data_train)[0]
     m_features = np.shape(data_train)[1]
 
-    # Gram matrix
-    #Gram = np.zeros((n_samples, n_samples))
-
-    #for i in range(n_samples):
-    #    for j in range(n_samples):
-    #        Gram[i,j] = np.dot(data_train[i], data_train[j])
-
-
     # Fistly I have to calculate the Gram matrix
     Gram = data_train.dot(data_train.T)
 
     # First equation
     # It is the sum of (y_i*y_j*<x_1,x_j>)
-
     P = np.outer(label_train,label_train) * Gram
-
-    print(P)
-
     # q is just a column of -1, ad q.T is multiplied by the alphas in the SVXOPT API
     q = np.ones(n_samples) * -1
 
-    print(q)
-
     # Second equation
-
     # G has a diagonal matrix in the top and an identity matrix in the bottom, as only the 
-    tmp1 = np.diag(np.ones(n_samples) * -1)
-    tmp2 = np.identity(n_samples)
-    G = np.vstack((tmp1, tmp2))
-
-    print(G)
-
-    tmp1 = np.zeros(n_samples)
-    tmp2 = np.ones(n_samples) * regularisation_para_C * (1/n_samples)
-    h = np.hstack((tmp1, tmp2))
-
-    print(h)
+    G = np.vstack((np.identity(n_samples) * -1.0, np.identity(n_samples)))
+    # h is just zeroes on the top and the cost restrains on the bottom
+    cost_restrain = np.ones(n_samples) * regularisation_para_C * (1/n_samples)
+    h = np.hstack((np.zeros(n_samples), cost_restrain))
 
     # Third equation
     # Corresponds to the sum of alpha_i*y_i= 0, so A will only by the labels and b a column of zeroes
     A = np.reshape(label_train, (1,n_samples))
     b = 0.0
 
-    
     # Convert to the CVXOPT matrix type
     P = cvxopt.matrix(P)
     q = cvxopt.matrix(q)
@@ -171,7 +148,16 @@ def svm_train_dual(data_train, label_train , regularisation_para_C):
 
     # Support vectors have non zero lagrange multipliers
     sup_vect_bool = lagrange > 0.00001
-    ind = np.arange(len(lagrange))[sup_vect_bool]
+
+    # Get the indexes of the support vectors
+    sup_vect_index = []
+    for i in range(len(lagrange)):
+        if lagrange[i] > 0.00001:
+            sup_vect_index.append(i)
+
+    sup_vect_index = np.asarray(sup_vect_index)
+
+    #sup_vect_index = np.arange(len(lagrange))[sup_vect_bool]
 
     # Get the support vectors for x and y
     lagrange = lagrange[sup_vect_bool]
@@ -187,12 +173,15 @@ def svm_train_dual(data_train, label_train , regularisation_para_C):
         weights = weights + sum
 
     # Intercept (b)
-    intercept = 0
-    for i in range(len(lagrange)):
-        intercept = intercept + sup_vect_y[i]
-        intercept =  intercept - np.sum(lagrange * sup_vect_y * Gram[ind[i], sup_vect_bool])
+    intercept = sup_vect_y - np.dot(data_train[sup_vect_index], weights)
+    intercept = np.mean(intercept)
 
-    intercept = intercept / len(lagrange)
+    #intercept = 0
+    #for i in range(len(lagrange)):
+    #    intercept = intercept + sup_vect_y[i]
+    #    intercept =  intercept - np.sum(lagrange * sup_vect_y * Gram[sup_vect_index[i], sup_vect_bool])
+
+    #intercept = intercept / len(lagrange)
 
 
 
@@ -254,26 +243,26 @@ def main():
 
 
 
-    svn_model = svm_train_dual(data_train = x_train, label_train= y_train, regularisation_para_C = 10000)
+    #svn_model = svm_train_dual(data_train = x_train, label_train= y_train, regularisation_para_C = 10000)
 
-    test_accuracy = svn_predict_dual(data_test = x_test,label_test = y_test, svn_model = svn_model)
+    #test_accuracy = svn_predict_dual(data_test = x_test,label_test = y_test, svn_model = svn_model)
 
-    print(test_accuracy)
-
-
+    #print(test_accuracy)
 
 
-    svn_model = svm_train_primal(data_train = x_train, label_train= y_train, regularisation_para_C = 10000)
 
-    test_accuracy = svn_predict_primal(data_test = x_test,label_test = y_test, svn_model = svn_model)
 
-    print(test_accuracy)
+    #svn_model = svm_train_primal(data_train = x_train, label_train= y_train, regularisation_para_C = 10000)
+
+    #test_accuracy = svn_predict_primal(data_test = x_test,label_test = y_test, svn_model = svn_model)
+
+    #print(test_accuracy)
 
     #------------------------------------------------------------------------
     # Tuning of the primal implementation
 
     # set up a 5-fold partition of the train data
-    k_fold = KFold(n_splits=5, random_state=23,shuffle=True)
+    k_fold = KFold(n_splits=10, random_state=28,shuffle=True)
 
     # Test different cost values in each split
     #cost_array = np.arange(start=0.5, stop=10.5, step=0.5)
@@ -302,6 +291,8 @@ def main():
                 # Train the SVM and get the accuracy
                 svn_model = svm_train_primal(data_train = kfold_x_train, label_train= kfold_y_train, regularisation_para_C = cost)
                 acc_kfold = svn_predict_primal(data_test = kfold_x_test, label_test = kfold_y_test, svn_model = svn_model)
+
+                print("Accuracy of the fold ",acc_kfold)
 
                 # Calculate the indexes and store them
                 acc.append(acc_kfold)
@@ -344,8 +335,6 @@ def main():
     # Get the accuracy of the final model on the test data
     test_accuracy = svn_predict_primal(data_test = x_test,label_test = y_test, svn_model = svn_model)
 
-    print(test_accuracy)
-
     print("Testing final model - primal implementation")
     print("Accuracy:", test_accuracy)
 
@@ -356,7 +345,7 @@ def main():
     # Tuning of the dual implementation
 
     # set up a 5-fold partition of the train data
-    k_fold = KFold(n_splits=5, random_state=23,shuffle=True)
+    k_fold = KFold(n_splits=10, random_state=28,shuffle=True)
 
     # Test different cost values in each split
     #cost_array = np.arange(start=0.5, stop=10.5, step=0.5)
@@ -383,8 +372,8 @@ def main():
                 kfold_y_train, kfold_y_test = y_train[kfold_train_index], y_train[kfold_test_index]
 
                 # Train the SVM and get the accuracy
-                svn_model = svm_train_primal(data_train = kfold_x_train, label_train= kfold_y_train, regularisation_para_C = cost)
-                acc_kfold = svn_predict_primal(data_test = kfold_x_test, label_test = kfold_y_test, svn_model = svn_model)
+                svn_model = svm_train_dual(data_train = kfold_x_train, label_train= kfold_y_train, regularisation_para_C = cost)
+                acc_kfold = svn_predict_dual(data_test = kfold_x_test, label_test = kfold_y_test, svn_model = svn_model)
 
                 # Calculate the indexes and store them
                 acc.append(acc_kfold)
@@ -420,7 +409,7 @@ def main():
     print("Using cost = ", cost_max)
 
     print("Training final model")
-    
+
     # Final model training using the cost we obtained using cross validation
     svn_model = svm_train_primal(data_train = x_train, label_train= y_train, regularisation_para_C = cost_max)
 
