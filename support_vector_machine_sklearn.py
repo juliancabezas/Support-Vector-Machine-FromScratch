@@ -1,6 +1,6 @@
 ###################################
 # Julian Cabezas Pena
-# Instroduction to Statistical Machine Learning
+# Introduction to Statistical Machine Learning
 # University of Adelaide
 # Assingment 1
 # Support Vector Machine Classifer using scikit-learn
