@@ -1,99 +1,103 @@
 ###################################
 # Julian Cabezas Pena
-# Deep Learning Fundamentals
+# Instroduction to Statistical Machine Learning
 # University of Adelaide
 # Assingment 1
-# Support Vector Machine Classifer testiong in the PIMA diabetes data
+# Support Vector Machine Classifer using scikit-learn
 ####################################
 
-
+# Import libraries
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.svm import SVC
+import os
 
 
-# Main function, it will preprocess the data, create train and test data,
-# tune the parameters of the Random forest and evaluate the final model
+# Main function, it will read the data, tune the C parameters and evaluate the final model
 def main():
 
     # Train data
 
     # Read the database using pandas
-    data = pd.read_csv("Input_Data/train.csv")
+    data = pd.read_csv("Input_Data/train.csv", header=None)
 
     # Recode the output column to get -1 and 1 output values
-    #data.iloc[:, 0] = np.where(data.iloc[:, 0] == 0, -1, data.iloc[:, 0])
+    data.iloc[:, 0] = np.where(data.iloc[:, 0] == 0, -1, data.iloc[:, 0])
 
-    # Generate lists of lists
-    #x_train = data.iloc[:, -1:].values
+    # Generate numpy arrays with explanatory features (x) and target feature (y)
     x_train = data.drop(data.columns[0], axis=1).values
     y_train = data.iloc[:, 0].values
-
-    print(x_train)
-    print(y_train)
 
     # Test data
 
     # Read the database using pandas
-    data = pd.read_csv("Input_Data/test.csv")
+    data = pd.read_csv("Input_Data/test.csv", header=None)
 
     # Recode the output column to get -1 and 1 output values
-    #data.iloc[:, 0] = np.where(data.iloc[:, 0] == 0, -1, data.iloc[:, 0])
+    data.iloc[:, 0] = np.where(data.iloc[:, 0] == 0, -1, data.iloc[:, 0])
 
-    # Generate lists of lists
-    #x_test = data.iloc[:, -1:].values
+    # Generate numpy arrays
     x_test = data.drop(data.columns[0], axis=1).values
     y_test = data.iloc[:, 0].values
 
-    print(x_test)
-    print(y_test)
 
     # set up a 5-fold partition of the train data
-    k_fold = KFold(n_splits=5, random_state=23,shuffle=True)
+    k_fold = KFold(n_splits=5, random_state=28, shuffle=True)
 
     # Test different cost values in each split
-    #cost_array = np.arange(start=0.5, stop=10.5, step=0.5)
-    cost_array = [0.01, 0.5, 1.0, 5.0, 10.0]
+    cost_array = [1.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0]
 
     # Store the partial results in lists
     cost_full = []
     acc_full = []
 
-    # Loop trough the different combinations of step and number of iterations
-    for cost in cost_array:
+    # Check if the tuning was already done
+    if not os.path.exists('Cross_Validation/cost_cv_svm_sklearn.csv'):
 
-        # Store partial results for accuracy, cohen kappa and F1
-        acc = []
+        # Loop trough the different combinations of step and number of iterations
+        for cost in cost_array:
 
-        # Initialize the support vector classifier
-        svm = SVC(random_state=124, kernel='linear', C = cost)
-    
-        # Iterate thorgh the folds
-        for kfold_train_index, kfold_test_index in k_fold.split(x_train, y_train):
-            
-            # Get the split into train and test
-            kfold_x_train, kfold_x_test = x_train[kfold_train_index][:], x_train[kfold_test_index][:]
-            kfold_y_train, kfold_y_test = y_train[kfold_train_index], y_train[kfold_test_index]
+            # Store partial results for accuracy, cohen kappa and F1
+            acc = []
 
-            # Train the SVM and get the predicted values
-            svm.fit(kfold_x_train,kfold_y_train)
-            predicted = svm.predict(kfold_x_test)
+            # Correction factor for the cost to be able to compare it with the primal and dual implementation (C/n)
+            cost_n = cost / (8500*0.8)
 
-            # Calculate the indexes and store them
-            acc.append(accuracy_score(kfold_y_test,predicted))
+            # Initialize the support vector classifier
+            svm = SVC(kernel = 'linear', C = cost_n)
 
-        print("Testing the model with cost = ", cost)
-        
-        # Store the mean of the indexes for the 4 folds
-        cost_full.append(cost)
-        acc_full.append(np.mean(acc))
-        print("Mean Accuracy = ", np.mean(acc))
+            # Iterate thorgh the folds
+            for kfold_train_index, kfold_test_index in k_fold.split(x_train, y_train):
 
-    # Create pandas dataset
-    dic = {'cost':cost_full, 'accuracy':acc_full}
-    df_grid_search = pd.DataFrame(dic)
+                # Get the split into train and test
+                kfold_x_train, kfold_x_test = x_train[kfold_train_index][:], x_train[kfold_test_index][:]
+                kfold_y_train, kfold_y_test = y_train[kfold_train_index], y_train[kfold_test_index]
+
+                # Train the SVM and get the predicted values
+                svm.fit(kfold_x_train, kfold_y_train)
+                predicted = svm.predict(kfold_x_test)
+
+                # Calculate the indexes and store them
+                acc.append(accuracy_score(kfold_y_test, predicted))
+
+            print("Testing the model with cost = ", cost)
+
+            # Store the mean of the indexes for the 5 folds
+            cost_full.append(cost)
+            acc_full.append(np.mean(acc))
+            print("Mean Accuracy = ", np.mean(acc))
+
+        # Create pandas dataset with the results and write to csv
+        dic = {'cost': cost_full, 'accuracy': acc_full}
+        df_grid_search = pd.DataFrame(dic)
+        df_grid_search.to_csv('Cross_Validation/cost_cv_svm_sklearn.csv')
+        print("Tuning Ready!")
+    else:
+        # In case the parameters were already tuned, read the file with the results
+        df_grid_search = pd.read_csv('Cross_Validation/cost_cv_svm_sklearn.csv')
+        print("Previous tuning detected")
 
     print("Tuning Ready!")
 
@@ -105,35 +109,34 @@ def main():
 
     print("")
     print("The parameter was chosen looking at the maximum accuracy score")
-    print("Accuracy:", df_grid_search['accuracy'][row_max])
-    print("Using cost = ", cost_max)
+    print("Final cost parameter = ", cost_max/8500)
 
     print("Training final model")
 
     # Training of the final model
-    svm = SVC(random_state = 124, kernel='linear', C = cost_max)
+    svm = SVC(kernel='linear', C=cost_max/8500)
 
-    svm.fit(x_train,y_train)
+    svm.fit(x_train, y_train)
+
+    # Calculate the training accuracy
+    predicted_train = svm.predict(x_train)
+    acc_train = accuracy_score(y_train, predicted_train)
+    print("Train Accuracy:", acc_train)
+
+    # Predict in the test dada
     predicted_final = svm.predict(x_test)
 
     # Calculate the indexes of the final results
-    acc_final = accuracy_score(y_test,predicted_final)
+    acc_final = accuracy_score(y_test, predicted_final)
 
     print("Testing final model")
-    print("Accuracy:", acc_final)
+    print("Test Accuracy:", acc_final)
 
-    # Confusion matrix
-    print("Confusion matrix:")
-    print(confusion_matrix(y_test,predicted_final))
-
-    print("Parameters of the model:")
-    print('w = ',svm.coef_)
-    print('b = ',svm.intercept_)
-    print('Number of support vectors = ', svm.n_support_)
-    print('Support vectors (indices) = ', svm.support_)
-    print('Support vectors (data) = ', svm.support_vectors_)
-    print('Coefficients of the support vector= ', np.abs(svm.dual_coef_))
+    # Store w and b
+    dic = {'w_b': np.append(svm.coef_, np.array(svm.intercept_))}
+    df_parameters = pd.DataFrame(dic)
+    df_parameters.to_csv('Results/model_parameters_sklearn.csv')
 
 
 if __name__ == '__main__':
-	main()
+    main()
