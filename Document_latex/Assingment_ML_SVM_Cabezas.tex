@@ -69,7 +69,7 @@ University of Adelaide, SA 5005 Australia\\
 
 In the field of machine learning  and pattern recognition, classification problems are one of the most common tasks. In these kind of problems, an algorithm takes a vector $X$ as input, and assigns it to one or many $K$ discrete classes \cite{Bishop2006}. Considering that the labelled data take values in a discrete set, the input space can be divided in regions that can be labelled according to the classification. Boundaries of these regions can be smooth or rough, depending on the function applied by the algorithm \cite{Hastie2009}. When lineal functions are used to estimate these decision boundaries or surfaces, these algorithms can be labelled as part of the "linear models for classification" family, while data sets whose classes can be separated by lineal functions, are often called to be lineally separable \cite{Bishop2006}.
 
-One of the most common algorithms used in classification problems is the Support Vector Machine (SVM). This supervised classification algorithm was developed by Vapnik \cite{Vapnik1995}, and uses an hyperplane that separates a high dimensional space defined by the input variables into discrete classes. This hyperplane is defined to have the largest possible distances to the closest point of either class \cite{Hastie2009}, thus, maximizing the margin ($M$) between two classes. This algorithm can define an hyperplane even when classes overlap (non linearly separable), maximizing the margin but allowing some points to be in the wrong side of the boundary.
+One of the most common algorithms used in classification problems is the Support Vector Machine (SVM). This supervised classification algorithm was developed by Vapnik \cite{Vapnik1995}, and uses an hyperplane that separates a high dimensional space defined by the input variables into discrete classes. This hyperplane is defined to have the largest possible distances to the closest point of either class \cite{Hastie2009}, thus, maximising the margin ($M$) between two classes. This algorithm can define an hyperplane even when classes overlap (non linearly separable), maximizing the margin but allowing some points to be in the wrong side of the boundary.
 
 The objective of this project is to implement the Support Vector Machine using using convex optimization to solve the primal and dual forms of the algorithm. The implemented methods will be compared with the implementation of the Support Vector Machine Classifier implemented in the commonly used Scikit-learn package, using a simulated dataset.
 
@@ -80,7 +80,7 @@ The objective of this project is to implement the Support Vector Machine using u
 
 \subsection{Maximal margin classifier}
 
-The margin can be interpreted as the distance of a hyperplane and the closest data points, in the field of machine learning, a hyperplane that can separate two or more classes, maximizing the margin (or the distance to the closest points) is called a maximal margin classier (Figure \ref{fig:margin}). This concept is used in many classification algorithms, that seek to maximize this distance. The advantage of this maximal margin classification is that can create a great level of generalization, easily transferring the learning in the training data to the testing data
+The margin can be interpreted as the distance of a hyperplane and the closest data points, in the field of machine learning, a hyperplane that can separate two or more classes, maximising the margin (or the distance to the closest points) is called a maximal margin classier (Figure \ref{fig:margin}). This concept is used in many classification algorithms, that seek to maximise this distance. The advantage of this maximal margin classification is that it can produce a great level of generalisation, easily transferring the learning in the training data to the testing data.
 
 \begin{figure}[h]
 	\begin{center}
@@ -90,11 +90,11 @@ The margin can be interpreted as the distance of a hyperplane and the closest da
 	\label{fig:margin}
 \end{figure}
 
-Another big advantages of the maximum margin concept is that it can be easily generalizable to multiple dimensions, allowing to generate multidimensional hyperplanes, the maximum margin classifier can also be applied to transformed data, allowing us to work with kernels \cite{Bishop2006}
+Another big advantage of the maximum margin concept is that it can be easily generalisable to multiple dimensions, allowing to generate multidimensional hyperplanes, the maximum margin classifier can also be applied to transformed data, allowing us to work with kernels \cite{Bishop2006}.
 
 \subsection{Hard Margin SVM}
 
-When implementing the SVM, we can assume we count with $n$ points of data corresponding to pairs of $m$ independent variables $x$ and dependent variable $y$, as $(x_1,y_1), (x_2,y_2), (x_3,y_3) ... (x_n,y_n)$, were $x$ belong to the real realm and y is coded like ${-1,1}$ (binary class)
+When implementing the SVM, we can assume we count with $n$ points of data corresponding to pairs of $m$ independent variables $x$ and dependent variable $y$, as $(x_1,y_1), (x_2,y_2), (x_3,y_3) ... (x_n,y_n)$, were $x$ belong to the real realm and $y$ is a vector of true labels coded like ${-1,1}$ (binary class).
 
 The objective of the SVM is to find an hyperplane defined by the coefficients $w$ and the intercept $b$:
 
@@ -102,13 +102,13 @@ The objective of the SVM is to find an hyperplane defined by the coefficients $w
 	f(x) = w^T x + b
 \end{equation}
 
-That should give $y_i f(x_i) > 0$ $\forall \: i$, meaning all the samples are well classified, using the sign function as classification rule
+That should give $y_i f(x_i) > 0$ $\forall \: i$, meaning all the samples are well classified, using the sign function as classification rule:
 
 \begin{equation}
 	C(x) = sign(w^T x_i + b)
 \end{equation}
 
-This constrains are only able to be followed if the dataset is linearly separable, meaning a hyperplane that completely separates the two classes can be found. Hence, the optimization problem is to find the biggest margin $M$ between classes
+This constrains are only able to be followed if the dataset is linearly separable, meaning a hyperplane that completely separates the two classes can be found. Hence, the optimization problem is to find the biggest margin $M$ between classes:
 
 \begin{equation}
 	max_{w,b} \: M
@@ -120,7 +120,7 @@ This constrains are only able to be followed if the dataset is linearly separabl
 
 \subsubsection{Primal form}
 
-As the margin can be understood as the distance of the closest points to the hyperplane ($1/||w||$) towards both sides \cite{Hastie2009}, it is possible to conveniently redefine this equation as a minimization problem, as follows:
+As the margin can be understood as the distance of the closest points to the hyperplane ($1/||w||$) towards both sides \cite{Hastie2009} (with $||w||$ being the L2 norm), it is possible to conveniently redefine this equation as a minimization problem, as follows:
 
 \begin{equation}
 	min_{w,b} \frac{1}{2}||w||^2
@@ -130,7 +130,7 @@ As the margin can be understood as the distance of the closest points to the hyp
 	subject \:\:to  \:\: y_i(w^T x_i + b) \geq 1
 \end{equation}
 
-This formulation is called the \textbf{primal} form of the problem, and it is considered a convex optimization problem. The Lagrange form of this equation can be also written as \cite{Bishop2006}
+This formulation is called the \textbf{primal} form of the problem, and it is considered a convex optimization problem. The Lagrange form (where $\alpha$ are the lagrange multipliers) of this equation can be also written as \cite{Bishop2006}:
 
 \begin{equation}
 	L(w,b,\alpha) = \frac{1}{2}||w||^2 - \sum_{i=1}^{n} \alpha_i (y_i(w^T x_i + b) -1) 
@@ -138,7 +138,7 @@ This formulation is called the \textbf{primal} form of the problem, and it is co
 
 \subsubsection{Dual Form}
 
-If we consider the partial derivatives of w and b in the primal form and set them to be equal to zero, we can get the following conditions
+If we consider the partial derivatives of w and b in the primal form and set them to be equal to zero, we can get the following conditions:
 
 \begin{equation}
 	w = \sum_{i=1}^{n} \alpha_i y_i x_i
@@ -154,13 +154,13 @@ If we eliminate the $b$ and $w$ terms of the primal form equations it is possibl
 	L(\alpha) = \sum_{i=1}^{n} \alpha_i - \frac{1}{2} \sum_{i=1}^{n} \sum_{j=1}^{m} \alpha_i \alpha_j y_i y_j x_i^T x_j
 \end{equation}
 
-For computation purposes, it is convenient to express that equation as
+For computation purposes, it is convenient to express that equation as:
 
 \begin{equation}
 	min_{(\alpha)} \frac{1}{2} \sum_{i=1}^{n} \sum_{j=1}^{m} \alpha_i \alpha_j y_i y_j x_i^T x_j - \sum_{i=1}^{n} \alpha_i
 \end{equation}
 
-with constrains
+with constrains:
 
 \begin{equation}
 	\alpha_i \geq 0  \:\:\: \forall i
@@ -172,7 +172,7 @@ with constrains
 
 \subsection{Soft Margin SVM}
 
-In real-world data, the data is often not linearly separable, so it is convenient to "allow" the classifier to consider that some points will not be classified correctly, for that, the slack variables $\xi = (\xi_1,\xi_2,\xi_3 ... \xi_n)$ are considered, such that we continue to maximize the margin, but we allow some flexibility, that allows some points to be "misclassifed" as shown in Figure 2:
+In real-world data, the data is often not linearly separable, so it is convenient to "allow" the classifier to consider that some points will not be classified correctly, for that, the slack variables $\xi = (\xi_1,\xi_2,\xi_3 ... \xi_n)$ are considered, such that we continue to maximize the margin, but we permit some flexibility, that allows some points to be misclassified, as shown in Figure 2:
 
 \begin{figure}[h]
 	\begin{center}
@@ -189,7 +189,7 @@ In real-world data, the data is often not linearly separable, so it is convenien
 
 \subsubsection{Primal form}
 
-By including this new term, it is possible to write the optimization function as
+By including this new term, it is possible to write the optimization function as:
 
 \begin{equation}
 min \frac{1}{2}||w||^2 + \frac{C}{n} \sum^n_{i=1}\xi_i
@@ -207,7 +207,7 @@ y_i(w^T x_i + b) \geq 1 - \xi_i \:\:\:\forall i
 
 The term C (cost) here is a regularization parameter, that determines the weights of the misclassified samples, with small cost more samples are allowed to be inside de margin boundaries, while a big C will be penalizing those samples harder, this would mean that an infinite C would create a hard margin classifier.
 
-This equation can be also expressed using the lagrangean form 
+This equation can be also expressed using the Lagrange form 
 
 \begin{multline}
 L(w,b,\alpha) = \frac{1}{2}||w||^2 +\frac{C}{n} \sum^n_{i=1}\xi_i \\ \sum_{i=1}^{n} \alpha_i (y_i(w^T x_i + b) - (1 - \xi_i)) - \sum^n_{i=1} \mu_i \xi_i
@@ -229,20 +229,19 @@ In order to get a more convenient optimizing function, it is possible to set the
 	\alpha_i = C - \mu_i \:\:\: \forall i
 \end{equation}
 
-
-Obtaining the Lagrange function
+Obtaining the Lagrange function:
 
 \begin{equation}
 	L(\alpha) = \sum_{i=1}^{n} \alpha_i - \frac{1}{2} \sum_{i=1}^{n} \sum_{j=1}^{m} \alpha_i \alpha_j y_i y_j x_i^T x_j
 \end{equation}
 
-In order to have a minimizable, it is possible to write the optimization function as
+In order to have a minimizable, it is possible to write the optimization function as:
 
 \begin{equation}
 	min_{(\alpha)} \frac{1}{2} \sum_{i=1}^{n} \sum_{j=1}^{m} \alpha_i \alpha_j y_i y_j x_i^T x_j - \sum_{i=1}^{n} \alpha_i
 \end{equation}
 
-with constrains
+with constrains (where $\mu$ is a constant)
 
 \begin{equation}
 	0 \leq \alpha_i \leq \frac{C}{n}   \:\:\: \forall i
@@ -256,11 +255,11 @@ with constrains
 
 When optimizing these Lagrange functions, typically many of the $\alpha$ values are equal to zero \cite{Hastie2009}, as these points are far away from the separating hyperplane. Thus, the hyperplane is defined by a subset of the the data points, that are called "support vectors", that are shown in Figures 1 and 2.
 
-As the support vectors are close to the hyperplane (Figures 1 and 2), if their are removed, the position of the hyperplane would change, thus, if data point that is not a support vector is removed, the hyperplane would not change. The amount of support vectors that are included in soft margin SVM is influenced by the cost ($C$) parameter, if the C value is bigger, the misclassification would be penalized hardly in the model, making the margin smaller and considering fewer support vectors.
+As the support vectors are close to the hyperplane (Figures 1 and 2), if one of them is removed, the position of the hyperplane would change, thus, if a data point that is not a support vector is removed, the hyperplane would not change. The amount of support vectors that are included in soft margin SVM is influenced by the cost ($C$) parameter, if the C value is bigger, the misclassification would be penalized hardly in the model, making the margin smaller and considering fewer support vectors.
 
 \subsection{Third Party Implementation: \textit{Scikit-learn}}
 
-In order to compare the implemented method with more mainstream application of the Support Vector Machine Classifier, a third party library was used to solve the classification problem. In this case the Scikit-learn library was chosen due to its wide popularity in the machine learning community.
+In order to compare the implemented method with more mainstream application of the Support Vector Machine Classifier, a third party library was used to solve the classification problem. In this case, the Scikit-learn library was chosen due to its wide popularity in the machine learning community.
 
 \textit{Scikit-learn} is a Python library that integrates various tools for statistics and machine learning applications, that include classification, regression, metrics and feature selection, among many others. This library is distributed under a BSD licence and includes compiled code, that makes it very efficient. The library is built using other popular numerical Python libraries, such as \textit{Numpy} and \textit{Scipy} \cite{Pedregosa2011}.
 
@@ -286,7 +285,7 @@ The mathematical formulation of the SVM in the scikit-learn package
  	\xi_i  \geq 0 \:\:\: \forall i
  \end{equation}
  
-As the SVM implementation of this library can work with several kernel functions. The constrains includes the $\phi$, transformation, that can take the form of a linear, radial, polynomial or sigmoid function. As the focus of this project is to compare this implementation with the primal and dual forms explained above, the function to be used is the linear function, meaning that $w^T \phi (x_i)$ is equal to $w^T x_i$.
+As the SVM implementation of this library can work with several kernel functions. The constraint includes the $\phi$, transformation, that can take the form of a linear, radial, polynomial or sigmoid function. As the focus of this project is to compare this implementation with the primal and dual forms explained above, the function to be used is the linear function, meaning that $w^T \phi (x_i)$ is equal to $w^T x_i$.
 
 Additionally, as in the minimization function $w^T w$ can be interpreted as  $||w||^2$, it is possible to rewrite the equation as 
 
@@ -312,7 +311,7 @@ The optimization problem in this library is solved using the dual form of the pr
 
 \subsubsection{Databases}
 
-The database in which the implemented methods will be tested corresponds to two datasets. In one hand, the train dataset counts with the 8500 records of data and 200 features, with a target variable that contains two classes, that were encoded as ${-1,1}$. Additionally, , the test dataset has 1500 samples, and the same amount of features (200). The database is not linearly separable, thus the soft margin implementation of the SVN (both in its primal and dual forms) were used to train the model in the train dataset and get predictions in the test data.
+The database in which the implemented methods will be tested corresponds to two datasets. In one hand, the train dataset counts with the 8500 records of data and 200 features, with a target variable that contains two classes, that were encoded as ${-1,1}$. Additionally, the test dataset has 1500 samples, and the same amount of features (200). The database is not linearly separable, thus the soft margin implementation of the SVN (both in its primal and dual forms) were used to train the model in the train dataset and get predictions in the test data.
 
 \subsubsection{Cross validation - C Parameter tuning}
 
@@ -350,9 +349,9 @@ subject to
 	Ax = b
 \end{equation}
 
-were $x$ corresponds to the values to be optimized, that in the primal form are the vector $[w,b,\xi]$ and in the dual form $[\alpha]$. The matrices P,q,G,b,A and b were constructed to match the dual and primal minimization problems.
+Where $x$ corresponds to the values to be optimized, that in the primal form are the vector $[w,b,\xi]$ and in the dual form $[\alpha]$. The matrices P,q,G,b,A and b were constructed to match the dual and primal minimization problems.
 
-As the cross validation to select the optimal C values can take several hours (depending of the computing power of the equipment), the code of the primal and dual implementations (support\_vector\_machine\_primal\_dual.py) was separated into several steps, and as the steps 1 and 2 can take a great amount of time, the software stores the intermediate results into .csv files, that are placed into the "./Cross\_Validation" folder. These results are read if a .csv file is detected in this folder, skipping the cross validation process (steps 3 and 4)
+As the cross validation to select the optimal C values can take several hours (depending of the computing power of the equipment), the code of the primal and dual implementations (support\_vector\_machine\_primal\_dual.py) was separated into several steps, and as the steps 1 and 2 can take a great amount of time, the software stores the intermediate results into .csv files, that are placed into the "./Cross\_Validation" folder. These results are read if a .csv file is detected in this folder, skipping the cross validation process (steps 3 and 4):
 
 \begin{itemize}
 	\item Step 0: Data Input and Preprocessing
@@ -372,7 +371,7 @@ The instructions to run the attached codes can be found in Appendix 1, or in the
 
 The results of the cross-validation process for finding the optimal C value gave the results shown in Figure \ref{fig:cv_cost}. It is important to note that the cost value in the scikit-learn was defined as $C/n$ to make this parameter equivalent to the primal and dual form implementations. As it is possible to notice, the cost values that were tested (from 1 to 100) do not greatly modify the performance of the model, ranging from \%96.84 when $C = 90$ for the Scikit-learn and primal form implementation, and an accuracy of \%97.21 in the best case for all three models when $C = 10$
 
-The behaviour of the three models is very similar, with the primal form and scikit-learn implementation being almost identical. In all the tested SVM models, the maximum accuracy is archived with the same C value (10, or equivalently in Scikit-learn, 1/n), that what then used to train the final models
+The behaviour of the three models is very similar, with the primal form and Scikit-learn implementation being almost identical. In all the tested SVM models, the maximum accuracy is archived with the same C value (10, or equivalently in Scikit-learn, 1/n), that what then used to train the final models
 
 \begin{figure}[h]
 	\begin{center}
@@ -387,7 +386,7 @@ The behaviour of the three models is very similar, with the primal form and scik
 
 Using the optimized C parameter, the final models for the implemented SVM forms were trained. The distribution of the weight (w) values (Figure \ref{fig:weights}) shows that 6 out of the 200 variables present larger absolute values, being more influential in the final outcome, as the scaling of the features is relatively similar.
 
-The weights of the three models are similar, with much more noticeable differences in the intercept (b), were the dual form gives $b = 1.1086$, and the primal form and the Scikit-learn implementations yielding $b=1.15601$ (presenting differences after the fourth decimal)
+The weights of the three models are similar, with much more noticeable differences in the intercept (b), were the dual form gives $b = 1.1086$, and the primal form and the Scikit-learn implementations yielding $b=1.15601$ (presenting differences after the fourth decimal).
 
 \begin{figure}[h]
 	\begin{center}
@@ -399,7 +398,7 @@ The weights of the three models are similar, with much more noticeable differenc
 
 \subsection{Training and testing performance}
 
-The results in the training and testing dataset show that the overfitting of this model was not a significant effect, with the accuracy values in the test data being only slightly smaller than the training accuracy (Table \ref{table:results}), showing the importance of using cross-validation to tune the hyperparameters of the model
+The results in the training and testing dataset show that the theme models did not show significant overfitting, with the accuracy values in the test data being only slightly smaller than the training accuracy (Table \ref{table:results}), showing the importance of using cross-validation to tune the hyperparameters of the model.
 
 \begin{table}[h]
 	\begin{center}
@@ -417,7 +416,7 @@ The results in the training and testing dataset show that the overfitting of thi
 	\label{table:results}
 \end{table}
 
-The three models show a test accuracy above 97\%, showing a high predicting performance of the SVM implementations for this database
+The three models show a test accuracy above 97\%, showing a high predicting performance of the SVM implementations for this database, showing the high performance the SVM can archive, even in non-separable cases.
 
 \section{Conclusion}
 
@@ -429,7 +428,7 @@ This project showed that with enough understanding of the principles and process
 }
 
 
-\textbf{Appendix 1: Instruction on how to run the attached code:}
+\textbf{Appendix 1: Instructions on how to run the attached code:}
 
 This code was tested under a Linux 64 bit OS (Ubuntu 18.04 LTS), using Python 3.7.7
 
@@ -463,7 +462,7 @@ Assign1-code
 └── ...
 \end{verbatim}
 
-If there are csv files in the Intermediate\_Results the code will read them to avoid the delay of the RFE and Gridsearch and go straight to fitting the models
+If there are csv files in the Cross\_Validation folder the code will read them to avoid the delay of the cross validation and go straight to fitting the models
 
 5.  Run the code in the conda environment: Open a terminal in the Assign1-code folder  and run 
 \begin{verbatim}
@@ -477,7 +476,7 @@ or run the support\_vector\_machine\_primal\_dual.py code in your IDE of prefere
 \begin{verbatim}
 python support_vector_machine_sklearn.py
 \end{verbatim}
-Note: Alternatevely, for 2 and 3 you can build your own environment following the package version contained in requirements.yml file
+Note: Alternatively, for 2 and 3 you can build your own environment following the package version contained in requirements.yml file
 
 \end{document}
 
